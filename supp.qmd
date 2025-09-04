@@ -55,6 +55,19 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 # Load required packages
 pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima)
 
+
+# Red pal
+custom_colors <- c(
+  "#f7fcfd",  # lightest
+  "#fdd49e",  # pale orange
+  "#fdbb84",  # orange
+  "#fc8d59",  # reddish-orange
+  "#ef6548",  # strong red-orange
+  "#d7301f",  # red
+  "#b30000",  # deep red
+  "#7f0000"   # very dark red/brown
+)
+
 ```
 
 ## Data Preparation
@@ -114,12 +127,13 @@ ggplot() +
   geom_point(data = points, aes(x = x, y = y), colour = "black") +
   scale_x_continuous(limits = c(113,154), name = "") +
   scale_y_continuous(limits = c(-43,-9), name = "") +
-  scale_fill_viridis_c(option = "plasma", na.value = NA) +
+  #scale_fill_viridis_c(option = "magma", na.value = NA) +
+  scale_fill_gradientn(colors = custom_colors, na.value = NA) +
   geom_sf(data = sleepy_lizard, fill = NA, color = "black", size = 0.8, lwd = 0.5) + 
   geom_sf(data = australia, fill = NA, color = "black", size = 0.8, lwd = 0.5) +
   coord_sf() +
   theme_minimal() +   
-  labs(fill = "TX90p")
+  labs(fill = "% of days \n> TX90p")
 
 ```
 
@@ -135,13 +149,13 @@ Now, we have the points of interest mapped. Next, we can use these points to ext
 
 # Extract microclimate data for points of interest. Run once for now and save object
 
-#locs <- list()
-for (i in 1:nrow(points)) {
-  locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]), email = "pieter.arnold@anu.edu.au")
-}
-#saveRDS(locs, "./outdir/micro/micro_locs_10.RDS")
+# locs <- list()
+# for (i in 1:nrow(points)) {
+#   locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]), email = "pieter.arnold@anu.edu.au")
+# }
+# saveRDS(locs, "./outdir/micro/micro_locs_2.RDS")
 
-locs <- readRDS("./outdir/micro/micro_locs_10.RDS")
+locs <- readRDS("./outdir/micro/micro_locs_2.RDS")
 summary(locs)
 
 ```
@@ -151,7 +165,7 @@ summary(locs)
 We have microclimates at the 10 locations in australia for those grids (size to be determined). Now we want to use the ectotherm function to calculate water and heat budgets for a Sleepy lizard at those locations along with activity budgets based on thermoregulatory parameters. We can also compute DEB life cycles at these locations too. 
 
 ```{r}
-#| label: sleepy_DEB
+#| label: sleepy_microclimate
 #| echo: false
 #| message: false
 #| warning: false
@@ -232,6 +246,8 @@ for(i in 1:length(locs)) {
 
 
 Take the micro silo and predict the temperature of the organism via heat and water budget. 
+Plot 1 = WA, plot 2 = NSW points. 
+Each plot % activity time, plots January fortnight. Behaviour (activity time constraint), rainfall, temps. 
 
 ```{r}
 #| label: heat_budget
@@ -239,28 +255,58 @@ Take the micro silo and predict the temperature of the organism via heat and wat
 #| message: false
 #| warning: false
 
+extract_times_activity <- function(x){
+  
+  # extract environments  & dates  
+  environ_lizard <- as.data.frame(x$environ)
+  environ_lizard$dates <- micro$dates
+  rain_lizard <- as.data.frame(x$rainfall)
+  colnames(rain_lizard) <- "rainfall"
+  rain_lizard$dates <- micro$dates2
+  rain_lizard$dates <- as.POSIXct(paste0(micro$dates2, " 00:00:00"), format = "%Y-%m-%d %H:%M:%S")
+  
+  # Filter to time and rearrange data
+  environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") %>%
+    select(dates, TA, TC) %>%
+    pivot_longer(cols = c(TA,TC),
+                 names_to = "Temps",
+                 values_to = "Temperature") %>%
+    mutate(Temps = ifelse(Temps == "TA", "Air temperature (2 m)", "Body temperature"))
+  
+  
+  rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
+  
+  # Check activity
+  per_active_day <- environ_lizard  %>%
+    group_by(DAY) %>%
+    summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
+  
+  return(list(environ_lizard2 = environ_lizard2,rain_lizard2 =rain_lizard2, per_active_day=per_active_day))
+}
 
-environ_lizard <- as.data.frame(ecto_heat_activity[[1]]$environ)
-environ_lizard$dates <- micro$dates
-rain_lizard <- as.data.frame(ecto_heat_activity[[1]]$rainfall)
-colnames(rain_lizard) <- "rainfall"
-rain_lizard$dates <- micro$dates2
-rain_lizard$dates <- as.POSIXct(paste0(micro$dates2, " 00:00:00"), format = "%Y-%m-%d %H:%M:%S")
+list_process <- lapply(ecto_heat_activity, function(x) extract_times_activity(x))
 
-environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") %>%
-  select(dates, TA, TC) %>%
-  pivot_longer(cols = c(TA,TC),
-               names_to = "Temps",
-               values_to = "Temperature") %>%
-  mutate(Temps = ifelse(Temps == "TA", "Air temperature (2 m)", "Body temperature"))
-
-
-rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
-
-# Check activity
-per_active_day <- environ_lizard  %>%
-                  group_by(DAY) %>%
-                  summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
+# environ_lizard <- as.data.frame(ecto_heat_activity[[1]]$environ)
+# environ_lizard$dates <- micro$dates
+# rain_lizard <- as.data.frame(ecto_heat_activity[[1]]$rainfall)
+# colnames(rain_lizard) <- "rainfall"
+# rain_lizard$dates <- micro$dates2
+# rain_lizard$dates <- as.POSIXct(paste0(micro$dates2, " 00:00:00"), format = "%Y-%m-%d %H:%M:%S")
+# 
+# environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") %>%
+#   select(dates, TA, TC) %>%
+#   pivot_longer(cols = c(TA,TC),
+#                names_to = "Temps",
+#                values_to = "Temperature") %>%
+#   mutate(Temps = ifelse(Temps == "TA", "Air temperature (2 m)", "Body temperature"))
+# 
+# 
+# rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
+# 
+# # Check activity
+# per_active_day <- environ_lizard  %>%
+#                   group_by(DAY) %>%
+#                   summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
 
 #checks
 #day1 <- environ_lizard[1:24,]
@@ -271,21 +317,33 @@ per_active_day <- environ_lizard  %>%
 img <- image_read("./pic/Subject.png")
   g <- rasterGrob(img, interpolate = TRUE)
 
-p1 <- ggplot(environ_lizard2) +
-  geom_line(aes(y = Temperature, x = dates, col = Temps), show.legend = TRUE) +
-  geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") + 
-  # need to scale factor HERE as well
-  labs(y = "Temperature (˚C)", x = "Date") +
-  scale_colour_viridis_d(option = "magma", end = 0.8) +
-  scale_y_continuous(name = "Temperature (˚C)",
-                     sec.axis = sec_axis(~./1, name = "Rainfall (mm)")) +
-  annotate("text", x = as.POSIXct("2016-01-04"), y = 10, label = paste0("Median Daily Activity (%): ", round(median(per_active_day$per_active), digits =2)), hjust = 0, size = 12) +
-  annotation_custom(g, xmin = as.POSIXct("2016-01-04"), xmax = as.POSIXct("2016-01-13"), ymin = 0.5, ymax = 8) +
-  theme_classic() + theme(legend.position = c(0.2, 0.9),
-  legend.direction = "horizontal",
-                              legend.title = element_blank(),
-                              text = element_text(size = 20))
-p1  
+p1_list <- list()
+
+for(i in 1:length(list_process)){
+  environ_lizard2 <- list_process[[i]]$environ_lizard2
+  rain_lizard2 <- list_process[[i]]$rain_lizard2
+  per_active_day <- list_process[[i]]$per_active_day
+  
+  p1_list[[i]]<- ggplot(environ_lizard2) +
+    geom_line(aes(y = Temperature, x = dates, col = Temps), show.legend = TRUE) +
+    geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") + 
+    # need to scale factor HERE as well
+    labs(y = "Temperature (˚C)", x = "Date") +
+    scale_colour_viridis_d(option = "magma", end = 0.8) +
+    scale_y_continuous(name = "Temperature (˚C)", limits = c(0,45),
+                       sec.axis = sec_axis(~./1, name = "Rainfall (mm)")) +
+    annotate("text", x = as.POSIXct("2016-01-04"), y = 10, 
+             label = paste0("Median Daily Activity (%): ", round(median(per_active_day$per_active),
+                                                                 digits =2)), hjust = 0, size = 6) +
+    annotation_custom(g, xmin = as.POSIXct("2016-01-04"), xmax = as.POSIXct("2016-01-13"), 
+                      ymin = 0.5, ymax = 8) +
+    theme_classic() + theme(legend.position.inside = c(0.2, 0.9), legend.position = "inside",
+                            legend.direction = "horizontal",
+                            legend.title = element_blank(),
+                            text = element_text(size = 12))
+}
+
+cowplot::plot_grid(p1_list[[1]], p1_list[[2]], ncol = 2, nrow = 1)
 
 #ecto_heat_activity[[1]]
 
