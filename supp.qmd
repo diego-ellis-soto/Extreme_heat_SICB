@@ -196,7 +196,7 @@ We can also compute DEB life cycles at these locations too.
     T_F_min <- 26               # degrees C, lower body temperature for foraging
     T_F_max <- 39               # degrees C, upper body temperature for foraging
     T_B_min <- 13               # degrees C, minimum basking temperature
-   T_RB_min <- 13              # degrees C, temperature at which animal will move to a basking site
+   T_RB_min <- 13               # degrees C, temperature at which animal will move to a basking site
      CT_max <- 42               # degrees C, critical thermal maximum (animal will die if CT_kill = 1 and this threshold is exceeded)
      CT_min <- 3.5              # degrees C, critical thermal minimum (used by program to determine depth selected when inactive and burrowing)
 
@@ -207,12 +207,14 @@ We can also compute DEB life cycles at these locations too.
     nocturn <- 0                 # Nocturnal activity allowed (1) or not (0)?
      crepus <- 0                 # Crepuscular activity allowed (1) or not (0)?
      burrow <- 1                 # Shelter in burrow allowed (1) or not (0)?
+     mindepth <- 1               # Minimum burrowing depth
+     maxdepth <- 5              # Maximum burrowing depth
  shade_seek <- 1                 # Shade seeking allowed (1) or not (0)?
    pct_cond <- 10                # Percentage of animal surface contacting the substrate (\%)
 
 # Life history traits. Do for DEB
 # clutchsize <- 8                # Eggs per clutch
-#       L_b <- L.b              # Structural length at birth (cm)}\cr}
+#       L_b <- L.b               # Structural length at birth (cm)}\cr}
 
 #### Run ectotherm model for heat and activity budgets ####
 ecto_heat_activity <- list()
@@ -221,40 +223,45 @@ for(i in 1:length(locs)) {
 
   micro <- locs[[i]]
 
-  ecto_heat_activity[[i]] <- ectotherm( Ww_g = Ww_g,
-                      shape = shape,
-                    shape_b = shape_b,
-                     T_pref = T_pref,
-                    T_F_min = T_F_min,
-                  T_F_max = T_F_max,
-                  T_B_min = T_B_min,
-                 T_RB_min = T_RB_min,
-                   CT_min = CT_min,
-                   CT_max = CT_max,
-                    diurn = diurn,
-                  nocturn = nocturn,
-                   crepus = crepus,
-               shade_seek = shade_seek,
-                   burrow = burrow,
-                 pct_cond = pct_cond,
-                   nyears = 21,
-                   metout = micro$metout,
-                     soil = micro$soil, 
-                  soilpot = micro$soilpot,
-                soilmoist = micro$soilmoist, 
-                    humid = micro$humid,
-                    tcond = micro$tcond, 
-                  shadmet = micro$shadmet,
-                 shadsoil = micro$shadsoil, 
-                  shadpot = micro$shadpot,
-                shadmoist = micro$shadmoist,
-                shadhumid = micro$shadhumid,
-                shadtcond = micro$shadtcond)
-
+  ecto_heat_activity[[i]] <- 
+    ectotherm(Ww_g = Ww_g,
+              shape = shape,
+              shape_b = shape_b,
+              T_pref = T_pref,
+              T_F_min = T_F_min,
+              T_F_max = T_F_max,
+              T_B_min = T_B_min,
+              T_RB_min = T_RB_min,
+              CT_min = CT_min,
+              CT_max = CT_max,
+              diurn = diurn,
+              nocturn = nocturn,
+              crepus = crepus,
+              shade_seek = shade_seek,
+              burrow = burrow,
+              mindepth = mindepth,
+              maxdepth = maxdepth,
+              pct_cond = pct_cond,
+              nyears = 21,
+              metout = micro$metout,
+              soil = micro$soil, 
+              soilpot = micro$soilpot,
+              soilmoist = micro$soilmoist, 
+              humid = micro$humid,
+              tcond = micro$tcond, 
+              shadmet = micro$shadmet,
+              shadsoil = micro$shadsoil, 
+              shadpot = micro$shadpot,
+              shadmoist = micro$shadmoist,
+              shadhumid = micro$shadhumid,
+              shadtcond = micro$shadtcond)
 }
 
-   summary(ecto_heat_activity)
-   head(data.frame(ecto_heat_activity[[1]]$metout))
+   
+   # Checking the apparent dips and re-warming of body temperature each evening
+   plot(ecto_heat_activity[[i]]$environ[1:240,10], type = "l") # 10 = TA (body temp)
+   # TSKY and TSUB are both very low in 17,18 (5-6pm) 
+   # This was due to mindepth and maxdepth not being set.
   
 ```
 
@@ -270,8 +277,8 @@ Each plot % activity time, plots January fortnight. Behaviour (activity time con
 #| message: false
 #| warning: false
 
-date_min <- "2018-12-25"
-date_max <- "2019-01-07"
+date_min <- "2019-01-08"
+date_max <- "2019-01-22"
 
 extract_times_activity <- function(x){
   
@@ -319,10 +326,10 @@ for(i in 1:length(list_process)){
   p1_list[[i]] <- 
     ggplot() +
     geom_line(data = environ_lizard2, aes(y = Temperature, x = dates, colour = Temps)) +
-    geom_line(data = rain_lizard2, aes(y = rainfall*2, x = dates, colour = "Rainfall")) +
+    geom_line(data = rain_lizard2, aes(y = rainfall*4, x = dates, colour = "Rainfall")) +
     labs(y = bquote(Temperature~(degree*C)), x = "Date") +
     scale_y_continuous(limits = c(0,45),
-                       sec.axis = sec_axis(~./2, name = "Rainfall (mm)")) +
+                       sec.axis = sec_axis(~./4, name = "Rainfall (mm)")) +
     scale_colour_manual(name = "",
                         values = c("Air temperature (2 m)" = "black", 
                                    "Body temperature" = "goldenrod2",
@@ -330,7 +337,7 @@ for(i in 1:length(list_process)){
                         labels = c("Air Temperature", "Body Temperature", "Rain")) +
     annotate("text", x = as.POSIXct(date_max)-1e6, y = 10, # change if date changes
              label = paste0("Median Daily Activity (%): ",
-                            round(median(per_active_day$per_active), digits = 2)), hjust = 0) +
+                            round(median(per_active_day$per_active), digits = 1)), hjust = 0) +
     theme_classic() + 
     theme(legend.position.inside = c(0.2, 0.9), legend.position = "inside",
           legend.direction = "horizontal", legend.title = element_blank(),
@@ -347,18 +354,10 @@ for(i in 1:length(list_process)){
 
 ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
 
-ggarrange(p2_list[[1]], p2_list[[2]])
 
-top <- extreme_map
+top <- plot_grid(extreme_map, g, ncol = 2, rel_widths = c(1,0.5))
 bottom <- ggarrange(p1_list[[1]], p1_list[[2]], ncol = 2, common.legend = TRUE, legend = "bottom")
-plot_grid(top, bottom, nrow = 2, rel_heights = c(1.5,1))
-
-
-
-
-# For sleepy lizard inset picture, wherever that goes     
-    # annotation_custom(g, xmin = as.POSIXct("2016-01-04"), xmax = as.POSIXct("2016-01-13"), 
-    #                   ymin = 0.5, ymax = 8)
+plot_grid(top, bottom, nrow = 2, rel_heights = c(1.3,1))
 
 
 
