@@ -107,7 +107,7 @@ australia_sf <- ne_countries(scale = "large", country = "Australia", returnclass
 australia <- st_transform(australia_sf, crs(r))
 
 # Plot points
-points <- r_df  %>% dplyr::filter(((x > 124 & x < 125) | (x > 146 & x < 147)) & (y > -30 & y < -29))
+points <- r_df  %>% dplyr::filter(((x > 124 & x < 125) | (x > 135 & x < 136)) & (y > -30 & y < -29))
 
 # Check the CRS of the objects
 # st_crs(sleepy_lizard)
@@ -150,9 +150,9 @@ Now, we have the points of interest mapped. Next, we can use these points to ext
 # Extract microclimate data for points of interest. Run once for now and save object
 
 # locs <- list()
-# for (i in 1:nrow(points)) {
-#   locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]), email = "pieter.arnold@anu.edu.au")
-# }
+ for (i in 1:nrow(points)) {
+   locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]), email = "pieter.arnold@anu.edu.au")
+ }
 # saveRDS(locs, "./outdir/micro/micro_locs_2.RDS")
 
 locs <- readRDS("./outdir/micro/micro_locs_2.RDS")
@@ -240,7 +240,7 @@ for(i in 1:length(locs)) {
 }
 
    summary(ecto_heat_activity)
-   
+   head(data.frame(ecto_heat_activity[[1]]$metout))
   
 ```
 
