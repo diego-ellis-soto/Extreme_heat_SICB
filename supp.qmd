@@ -49,7 +49,7 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 }
 
 # Load required packages
-pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid)
+pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars)
 
 ```
 
@@ -63,6 +63,7 @@ Lets first map the Heat Wave Days (HWD) across the Sleepy lizard distribution. W
 #| message: false
 #| warning: false
 
+
 # Load the NetCDF file
 nc_file <- "./indir/BEST (Berkeley Earth Surface Temperature) 1880-2021_TX90p_ANN_AverageMap_2000-2021_-40.45to-9.94_107.27to170.02.nc"
 nc_data <- terra::rast(nc_file)
@@ -70,15 +71,12 @@ nc_data <- terra::rast(nc_file)
 # You can select the first layer or a specific variable
 r <- nc_data[[1]]
 
+
 # Load the Sleepy Lizard range shapefile
 sleepy_lizard <- st_read("./indir/sleepy_lizzard_range/data_0.shp")
 
 # Make sure CRS match
 sleepy_lizard <- st_transform(sleepy_lizard, crs(r))
-
-# Country outline: Australia
-australia <- ne_countries(scale = "large", country = "Australia", returnclass = "sf")
-australia <- st_transform(australia, crs(r))
 
 # Crop raster to sleepy lizard extent because that's all we need for microclimate models
 r_crop <- raster::mask(crop(r, extent(sleepy_lizard)), sleepy_lizard) # crop
@@ -87,20 +85,39 @@ r_crop <- raster::mask(crop(r, extent(sleepy_lizard)), sleepy_lizard) # crop
 r_df <- as.data.frame(r_crop, xy = TRUE, na.rm = TRUE)
 names(r_df)[3] <- "value"  # Rename value column
 
-# Plot points
-points <- r_df  %>% dplyr::filter(((x > 125 & x < 130) | (x > 145 & x < 150)) & (y > -30 & y < -29))
 
-# Plot with ggplot
+# Country outline: Australia
+australia_sf <- ne_countries(scale = "large", country = "Australia", returnclass = "sf")
+australia <- st_transform(australia_sf, crs(r))
+
+# Plot points
+points <- r_df  %>% dplyr::filter(((x > 124 & x < 125) | (x > 146 & x < 147)) & (y > -30 & y < -29))
+
+# Check the CRS of the objects
+# st_crs(sleepy_lizard)
+# st_crs(australia)
+
+r_stars <- st_as_stars(r_df, dims = c("x", "y"))
+st_crs(r_stars) <- st_crs(sleepy_lizard) 
+
+r_polygons <- st_as_sf(r_stars)
+
+# Clip to your boundaries
+r_clipped <- st_intersection(r_polygons, sleepy_lizard)
+
+# Plot with smooth boundaries
 ggplot() +
-  geom_raster(data = r_df, aes(x = x, y = y, fill = value)) +
-  geom_point(data = points, aes(x = x, y = y)) +
+  geom_sf(data = r_clipped, aes(fill = value), color = NA) +
+  geom_point(data = points, aes(x = x, y = y), colour = "black") +
+  scale_x_continuous(limits = c(113,154), name = "") +
+  scale_y_continuous(limits = c(-43,-9), name = "") +
   scale_fill_viridis_c(option = "plasma", na.value = NA) +
-  geom_sf(data = sleepy_lizard, fill = NA, color = "black", size = 0.8, lwd = 0.5) +  # <- thicker lines
+  geom_sf(data = sleepy_lizard, fill = NA, color = "black", size = 0.8, lwd = 0.5) + 
   geom_sf(data = australia, fill = NA, color = "black", size = 0.8, lwd = 0.5) +
   coord_sf() +
-  theme_minimal() +
-  labs(title = "Extreme Weather with Sleepy Lizard Range",
-       fill = "Extreme Weather\nValue")
+  theme_minimal() +   
+  labs(fill = "TX90p")
+
 ```
 
 ## Microclimate models
