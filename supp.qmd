@@ -55,6 +55,8 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 # Load required packages
 pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima)
 
+# Get climate data
+#get.global.climate(folder = "./outdir/global_climate")
 
 # Red pal
 custom_colors <- c(
