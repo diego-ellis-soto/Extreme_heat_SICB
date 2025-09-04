@@ -243,9 +243,9 @@ ggplot(environ_lizard2) +
   # need to scale factor HERE as well
   labs(y = "Temperature (˚C)", x = "Date") +
   scale_colour_viridis_d(option = "magma", end = 0.8) +
-  scale_y_continuous(name = "Body temperature (˚C)",
-                     sec.axis = sec_axis(~./1, name = "rainfall (mm)")) +
-  theme_minimal()
+  scale_y_continuous(name = "Temperature (˚C)",
+                     sec.axis = sec_axis(~./1, name = "Rainfall (mm)")) +
+  theme_classic()
   
 
 ecto_heat_activity[[1]]
