@@ -53,7 +53,7 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 # devtools::install_github("ilyamaclean/microclima")
 
 # Load required packages
-pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima)
+pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima, cowplot, ggpubr)
 
 # Get climate data
 #get.global.climate(folder = "./outdir/global_climate")
@@ -69,6 +69,11 @@ custom_colors <- c(
   "#b30000",  # deep red
   "#7f0000"   # very dark red/brown
 )
+
+# read the image
+img <- image_read("./pic/Subject.png")
+  g <- rasterGrob(img, interpolate = TRUE)
+
 
 ```
 
@@ -109,7 +114,7 @@ australia_sf <- ne_countries(scale = "large", country = "Australia", returnclass
 australia <- st_transform(australia_sf, crs(r))
 
 # Plot points
-points <- r_df  %>% dplyr::filter(((x > 124 & x < 125) | (x > 135 & x < 136)) & (y > -30 & y < -29))
+points <- r_df  %>% dplyr::filter(((x > 124 & x < 125) | (x > 115 & x < 116)) & (y > -30 & y < -29))
 
 # Check the CRS of the objects
 # st_crs(sleepy_lizard)
@@ -124,7 +129,8 @@ r_polygons <- st_as_sf(r_stars)
 r_clipped <- st_intersection(r_polygons, sleepy_lizard)
 
 # Plot with smooth boundaries
-ggplot() +
+extreme_map <- 
+  ggplot() +
   geom_sf(data = r_clipped, aes(fill = value), color = NA) +
   geom_point(data = points, aes(x = x, y = y), colour = "black") +
   scale_x_continuous(limits = c(113,154), name = "") +
@@ -136,6 +142,7 @@ ggplot() +
   coord_sf() +
   theme_minimal() +   
   labs(fill = "% of days \n> TX90p")
+extreme_map
 
 ```
 
@@ -151,10 +158,13 @@ Now, we have the points of interest mapped. Next, we can use these points to ext
 
 # Extract microclimate data for points of interest. Run once for now and save object
 
-locs <- list()
-for (i in 1:nrow(points)) {
-  locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]), dstart = "01/01/2000", dfinish = "01/01/2021", email = "pieter.arnold@anu.edu.au")
-}
+# locs <- list()
+# for (i in 1:nrow(points)) {
+#   locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]),
+#                                      dstart = "01/01/2000",
+#                                      dfinish = "01/01/2021",
+#                                      email = "pieter.arnold@anu.edu.au")
+# }
 # saveRDS(locs, "./outdir/micro/micro_locs_2.RDS")
 
 locs <- readRDS("./outdir/micro/micro_locs_2.RDS")
@@ -162,9 +172,11 @@ summary(locs)
 
 ```
 
-## Heat and water budgets plus dynamic energy budgets
+## Heat and water budgets, possibly plus dynamic energy budgets later
 
-We have microclimates at the 10 locations in australia for those grids (size to be determined). Now we want to use the ectotherm function to calculate water and heat budgets for a Sleepy lizard at those locations along with activity budgets based on thermoregulatory parameters. We can also compute DEB life cycles at these locations too. 
+We have microclimates at the 10 locations in australia for those grids (size to be determined). Now we want to use the ectotherm function to calculate water and heat budgets for a Sleepy lizard at those locations along with activity budgets based on thermoregulatory parameters. 
+
+We can also compute DEB life cycles at these locations too. 
 
 ```{r}
 #| label: sleepy_microclimate
@@ -184,7 +196,7 @@ We have microclimates at the 10 locations in australia for those grids (size to 
     T_F_min <- 26               # degrees C, lower body temperature for foraging
     T_F_max <- 39               # degrees C, upper body temperature for foraging
     T_B_min <- 13               # degrees C, minimum basking temperature
-   T_RB_min <- 13              # degrees C, temperature at which animal will move to a basking site
+   T_RB_min <- 13               # degrees C, temperature at which animal will move to a basking site
      CT_max <- 42               # degrees C, critical thermal maximum (animal will die if CT_kill = 1 and this threshold is exceeded)
      CT_min <- 3.5              # degrees C, critical thermal minimum (used by program to determine depth selected when inactive and burrowing)
 
@@ -195,12 +207,14 @@ We have microclimates at the 10 locations in australia for those grids (size to 
     nocturn <- 0                 # Nocturnal activity allowed (1) or not (0)?
      crepus <- 0                 # Crepuscular activity allowed (1) or not (0)?
      burrow <- 1                 # Shelter in burrow allowed (1) or not (0)?
+     mindepth <- 1               # Minimum burrowing depth
+     maxdepth <- 5              # Maximum burrowing depth
  shade_seek <- 1                 # Shade seeking allowed (1) or not (0)?
    pct_cond <- 10                # Percentage of animal surface contacting the substrate (\%)
 
 # Life history traits. Do for DEB
 # clutchsize <- 8                # Eggs per clutch
-#       L_b <- L.b              # Structural length at birth (cm)}\cr}
+#       L_b <- L.b               # Structural length at birth (cm)}\cr}
 
 #### Run ectotherm model for heat and activity budgets ####
 ecto_heat_activity <- list()
@@ -209,40 +223,45 @@ for(i in 1:length(locs)) {
 
   micro <- locs[[i]]
 
-  ecto_heat_activity[[i]] <- ectotherm( Ww_g = Ww_g,
-                      shape = shape,
-                    shape_b = shape_b,
-                     T_pref = T_pref,
-                    T_F_min = T_F_min,
-                  T_F_max = T_F_max,
-                  T_B_min = T_B_min,
-                 T_RB_min = T_RB_min,
-                   CT_min = CT_min,
-                   CT_max = CT_max,
-                    diurn = diurn,
-                  nocturn = nocturn,
-                   crepus = crepus,
-               shade_seek = shade_seek,
-                   burrow = burrow,
-                 pct_cond = pct_cond,
-                   nyears = 2,
-                   metout = micro$metout,
-                     soil = micro$soil, 
-                  soilpot = micro$soilpot,
-                soilmoist = micro$soilmoist, 
-                    humid = micro$humid,
-                    tcond = micro$tcond, 
-                  shadmet = micro$shadmet,
-                 shadsoil = micro$shadsoil, 
-                  shadpot = micro$shadpot,
-                shadmoist = micro$shadmoist,
-                shadhumid = micro$shadhumid,
-                shadtcond = micro$shadtcond)
-
+  ecto_heat_activity[[i]] <- 
+    ectotherm(Ww_g = Ww_g,
+              shape = shape,
+              shape_b = shape_b,
+              T_pref = T_pref,
+              T_F_min = T_F_min,
+              T_F_max = T_F_max,
+              T_B_min = T_B_min,
+              T_RB_min = T_RB_min,
+              CT_min = CT_min,
+              CT_max = CT_max,
+              diurn = diurn,
+              nocturn = nocturn,
+              crepus = crepus,
+              shade_seek = shade_seek,
+              burrow = burrow,
+              mindepth = mindepth,
+              maxdepth = maxdepth,
+              pct_cond = pct_cond,
+              nyears = 21,
+              metout = micro$metout,
+              soil = micro$soil, 
+              soilpot = micro$soilpot,
+              soilmoist = micro$soilmoist, 
+              humid = micro$humid,
+              tcond = micro$tcond, 
+              shadmet = micro$shadmet,
+              shadsoil = micro$shadsoil, 
+              shadpot = micro$shadpot,
+              shadmoist = micro$shadmoist,
+              shadhumid = micro$shadhumid,
+              shadtcond = micro$shadtcond)
 }
 
-   summary(ecto_heat_activity)
-   head(data.frame(ecto_heat_activity[[1]]$metout))
+   
+   # Checking the apparent dips and re-warming of body temperature each evening
+   plot(ecto_heat_activity[[i]]$environ[1:240,10], type = "l") # 10 = TA (body temp)
+   # TSKY and TSUB are both very low in 17,18 (5-6pm) 
+   # This was due to mindepth and maxdepth not being set.
   
 ```
 
@@ -251,11 +270,15 @@ Take the micro silo and predict the temperature of the organism via heat and wat
 Plot 1 = WA, plot 2 = NSW points. 
 Each plot % activity time, plots January fortnight. Behaviour (activity time constraint), rainfall, temps. 
 
+
 ```{r}
 #| label: heat_budget
 #| echo: false
 #| message: false
 #| warning: false
+
+date_min <- "2019-01-08"
+date_max <- "2019-01-22"
 
 extract_times_activity <- function(x){
   
@@ -268,7 +291,7 @@ extract_times_activity <- function(x){
   rain_lizard$dates <- as.POSIXct(paste0(micro$dates2, " 00:00:00"), format = "%Y-%m-%d %H:%M:%S")
   
   # Filter to time and rearrange data
-  environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") %>%
+  environ_lizard2 <- environ_lizard %>% filter(dates > date_min & dates < date_max) %>%
     select(dates, TA, TC) %>%
     pivot_longer(cols = c(TA,TC),
                  names_to = "Temps",
@@ -276,78 +299,67 @@ extract_times_activity <- function(x){
     mutate(Temps = ifelse(Temps == "TA", "Air temperature (2 m)", "Body temperature"))
   
   
-  rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
+  rain_lizard2 <- rain_lizard %>% filter(dates >= date_min & dates <= date_max)
   
   # Check activity
   per_active_day <- environ_lizard  %>%
     group_by(DAY) %>%
     summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
   
-  return(list(environ_lizard2 = environ_lizard2,rain_lizard2 =rain_lizard2, per_active_day=per_active_day))
+  return(list(environ_lizard2 = environ_lizard2, 
+              rain_lizard2 = rain_lizard2, 
+              per_active_day = per_active_day))
 }
 
 list_process <- lapply(ecto_heat_activity, function(x) extract_times_activity(x))
 
-# environ_lizard <- as.data.frame(ecto_heat_activity[[1]]$environ)
-# environ_lizard$dates <- micro$dates
-# rain_lizard <- as.data.frame(ecto_heat_activity[[1]]$rainfall)
-# colnames(rain_lizard) <- "rainfall"
-# rain_lizard$dates <- micro$dates2
-# rain_lizard$dates <- as.POSIXct(paste0(micro$dates2, " 00:00:00"), format = "%Y-%m-%d %H:%M:%S")
-# 
-# environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") %>%
-#   select(dates, TA, TC) %>%
-#   pivot_longer(cols = c(TA,TC),
-#                names_to = "Temps",
-#                values_to = "Temperature") %>%
-#   mutate(Temps = ifelse(Temps == "TA", "Air temperature (2 m)", "Body temperature"))
-# 
-# 
-# rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
-# 
-# # Check activity
-# per_active_day <- environ_lizard  %>%
-#                   group_by(DAY) %>%
-#                   summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
 
-#checks
-#day1 <- environ_lizard[1:24,]
-#(sum(day1$activity == "Active") / 13.89319) *100
-#hist(per_active_day$per_active) # Cannot be > 100, why?
-
-# read the image
-img <- image_read("./pic/Subject.png")
-  g <- rasterGrob(img, interpolate = TRUE)
 
 p1_list <- list()
+p2_list <- list()
 
 for(i in 1:length(list_process)){
   environ_lizard2 <- list_process[[i]]$environ_lizard2
   rain_lizard2 <- list_process[[i]]$rain_lizard2
   per_active_day <- list_process[[i]]$per_active_day
   
-  p1_list[[i]]<- ggplot(environ_lizard2) +
-    geom_line(aes(y = Temperature, x = dates, col = Temps), show.legend = TRUE) +
-    geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") + 
-    # need to scale factor HERE as well
-    labs(y = "Temperature (˚C)", x = "Date") +
-    scale_colour_viridis_d(option = "magma", end = 0.8) +
-    scale_y_continuous(name = "Temperature (˚C)", limits = c(0,45),
-                       sec.axis = sec_axis(~./1, name = "Rainfall (mm)")) +
-    annotate("text", x = as.POSIXct("2016-01-04"), y = 10, 
-             label = paste0("Median Daily Activity (%): ", round(median(per_active_day$per_active),
-                                                                 digits =2)), hjust = 0, size = 6) +
-    annotation_custom(g, xmin = as.POSIXct("2016-01-04"), xmax = as.POSIXct("2016-01-13"), 
-                      ymin = 0.5, ymax = 8) +
-    theme_classic() + theme(legend.position.inside = c(0.2, 0.9), legend.position = "inside",
-                            legend.direction = "horizontal",
-                            legend.title = element_blank(),
-                            text = element_text(size = 12))
+  p1_list[[i]] <- 
+    ggplot() +
+    geom_line(data = environ_lizard2, aes(y = Temperature, x = dates, colour = Temps)) +
+    geom_line(data = rain_lizard2, aes(y = rainfall*4, x = dates, colour = "Rainfall")) +
+    labs(y = bquote(Temperature~(degree*C)), x = "Date") +
+    scale_y_continuous(limits = c(0,45),
+                       sec.axis = sec_axis(~./4, name = "Rainfall (mm)")) +
+    scale_colour_manual(name = "",
+                        values = c("Air temperature (2 m)" = "black", 
+                                   "Body temperature" = "goldenrod2",
+                                   "Rainfall" = "skyblue2"),
+                        labels = c("Air Temperature", "Body Temperature", "Rain")) +
+    annotate("text", x = as.POSIXct(date_max)-1e6, y = 10, # change if date changes
+             label = paste0("Median Daily Activity (%): ",
+                            round(median(per_active_day$per_active), digits = 1)), hjust = 0) +
+    theme_classic() + 
+    theme(legend.position.inside = c(0.2, 0.9), legend.position = "inside",
+          legend.direction = "horizontal", legend.title = element_blank(),
+          text = element_text(size = 12))
+  
+  p2_list[[i]] <-
+    ggplot() +
+    geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") +
+    labs(y = "Rainfall (mm)", x = "Date") +
+    theme_classic()
+    
+    
 }
 
-cowplot::plot_grid(p1_list[[1]], p1_list[[2]], ncol = 2, nrow = 1)
+ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
 
-#ecto_heat_activity[[1]]
+
+top <- plot_grid(extreme_map, g, ncol = 2, rel_widths = c(1,0.5))
+bottom <- ggarrange(p1_list[[1]], p1_list[[2]], ncol = 2, common.legend = TRUE, legend = "bottom")
+plot_grid(top, bottom, nrow = 2, rel_heights = c(1.3,1))
+
+
 
 ```
 
