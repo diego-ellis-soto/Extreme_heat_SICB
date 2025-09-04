@@ -133,8 +133,8 @@ extreme_map <-
   ggplot() +
   geom_sf(data = r_clipped, aes(fill = value), color = NA) +
   geom_point(data = points, aes(x = x, y = y), colour = "black") +
-  scale_x_continuous(limits = c(113,154), name = "") +
-  scale_y_continuous(limits = c(-43,-9), name = "") +
+  scale_x_continuous(limits = c(113.5,151.8), name = "") +
+  scale_y_continuous(limits = c(-43,-12), name = "") +
   #scale_fill_viridis_c(option = "magma", na.value = NA) +
   scale_fill_gradientn(colors = custom_colors, na.value = NA) +
   geom_sf(data = sleepy_lizard, fill = NA, color = "black", size = 0.8, lwd = 0.5) + 
@@ -142,7 +142,7 @@ extreme_map <-
   coord_sf() +
   theme_void() +   
   labs(fill = "% of days \n> TX90p") +
-  annotation_custom(g, xmin = 112, xmax = 135, ymin = -50, ymax = -30)
+  annotation_custom(g, xmin = 112, xmax = 135, ymin = -50, ymax = -30) + theme(legend.position = "top")
 extreme_map
 
 ```
