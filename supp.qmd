@@ -49,7 +49,7 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 }
 
 # Load required packages
-pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse)
+pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid)
 
 ```
 
@@ -236,8 +236,22 @@ environ_lizard2 <- environ_lizard %>% filter(dates > "2016-01-01" & dates < "201
 
 
 rain_lizard2 <- rain_lizard %>% filter(dates > "2016-01-01" & dates < "2016-01-20") #%>%
-  
-ggplot(environ_lizard2) +
+
+# Check activity
+per_active_day <- environ_lizard  %>%
+                  group_by(DAY) %>%
+                  summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
+
+#checks
+#day1 <- environ_lizard[1:24,]
+#(sum(day1$activity == "Active") / 13.89319) *100
+#hist(per_active_day$per_active) # Cannot be > 100, why?
+
+# read the image
+img <- image_read("./pic/Subject.png")
+  g <- rasterGrob(img, interpolate = TRUE)
+
+p1 <- ggplot(environ_lizard2) +
   geom_line(aes(y = Temperature, x = dates, col = Temps), show.legend = TRUE) +
   geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") + 
   # need to scale factor HERE as well
@@ -245,12 +259,15 @@ ggplot(environ_lizard2) +
   scale_colour_viridis_d(option = "magma", end = 0.8) +
   scale_y_continuous(name = "Temperature (˚C)",
                      sec.axis = sec_axis(~./1, name = "Rainfall (mm)")) +
-  theme_classic()
-  
+  annotate("text", x = as.POSIXct("2016-01-04"), y = 10, label = paste0("Median Daily Activity (%): ", round(median(per_active_day$per_active), digits =2)), hjust = 0, size = 12) +
+  annotation_custom(g, xmin = as.POSIXct("2016-01-04"), xmax = as.POSIXct("2016-01-13"), ymin = 0.5, ymax = 8) +
+  theme_classic() + theme(legend.position = c(0.2, 0.9),
+  legend.direction = "horizontal",
+                              legend.title = element_blank(),
+                              text = element_text(size = 20))
+p1  
 
-ecto_heat_activity[[1]]
-
-ggplot()
+#ecto_heat_activity[[1]]
 
 ```
 
