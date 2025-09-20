@@ -369,8 +369,8 @@ ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
 #top <- plot_grid(extreme_map, g, ncol = 2, rel_widths = c(1,0.5))
 bottom <- ggarrange(p1_list[[1]], p1_list[[2]], ncol = 2, common.legend = TRUE, legend = "top")
 #plot_grid(top, bottom, nrow = 2, rel_heights = c(1.3,1))
-p1 <- p1_list[[1]] + theme(legend.position = "none")
-p2 <- p1_list[[2]]
+p1 <- p1_list[[1]] 
+p2 <- p1_list[[2]] + theme(legend.position = "none")
 plot_final <- extreme_map + 
   annotate("segment", x = 115.5, xend = 114, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
   annotate("segment", x = 124.5, xend = 130, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
