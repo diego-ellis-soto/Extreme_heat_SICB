@@ -159,14 +159,14 @@ Now, we have the points of interest mapped. Next, we can use these points to ext
 
 # Extract microclimate data for points of interest. Run once for now and save object
 
-# locs <- list()
-# for (i in 1:nrow(points)) {
-#   locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]),
-#                                      dstart = "01/01/2000",
-#                                      dfinish = "01/01/2021",
-#                                      email = "pieter.arnold@anu.edu.au")
-# }
-# saveRDS(locs, "./outdir/micro/micro_locs_2.RDS")
+locs <- list()
+for (i in 1:nrow(points)) {
+  locs[[i]] <- NicheMapR::micro_silo(loc = c(points[i,1], points[i,2]),
+                                     dstart = "01/01/2000",
+                                     dfinish = "01/01/2021",
+                                     email = "pieter.arnold@anu.edu.au")
+}
+saveRDS(locs, "./outdir/micro/micro_locs_2.RDS")
 
 locs <- readRDS("./outdir/micro/micro_locs_2.RDS")
 summary(locs)
@@ -209,7 +209,7 @@ We can also compute DEB life cycles at these locations too.
      crepus <- 0                 # Crepuscular activity allowed (1) or not (0)?
      burrow <- 1                 # Shelter in burrow allowed (1) or not (0)?
      mindepth <- 1               # Minimum burrowing depth
-     maxdepth <- 5              # Maximum burrowing depth
+     maxdepth <- 10              # Maximum burrowing depth
  shade_seek <- 1                 # Shade seeking allowed (1) or not (0)?
    pct_cond <- 10                # Percentage of animal surface contacting the substrate (\%)
 
@@ -256,6 +256,7 @@ for(i in 1:length(locs)) {
               shadmoist = micro$shadmoist,
               shadhumid = micro$shadhumid,
               shadtcond = micro$shadtcond)
+
 }
 
    
@@ -303,13 +304,13 @@ extract_times_activity <- function(x){
   rain_lizard2 <- rain_lizard %>% filter(dates >= date_min & dates <= date_max)
   
   # Check activity
-  per_active_day <- environ_lizard  %>%
+  per_active_day <- environ_lizard  %>% filter(dates > date_min & dates < date_max) %>% filter(TIME > 6 & TIME < 19) %>%
     group_by(DAY) %>%
-    summarise(per_active = (sum(ACT == 2)/ceiling(DAYLENGTH))*100)
+    summarise(TSM = mean(CT_max - TC))
   
   return(list(environ_lizard2 = environ_lizard2, 
-              rain_lizard2 = rain_lizard2, 
-              per_active_day = per_active_day))
+                 rain_lizard2 = rain_lizard2, 
+               per_active_day = per_active_day))
 }
 
 list_process <- lapply(ecto_heat_activity, function(x) extract_times_activity(x))
@@ -321,8 +322,8 @@ p2_list <- list()
 
 for(i in 1:length(list_process)){
   environ_lizard2 <- list_process[[i]]$environ_lizard2
-  rain_lizard2 <- list_process[[i]]$rain_lizard2
-  per_active_day <- list_process[[i]]$per_active_day
+     rain_lizard2 <- list_process[[i]]$rain_lizard2
+   per_active_day <- list_process[[i]]$per_active_day
   
   p1_list[[i]] <- 
     ggplot() +
@@ -332,35 +333,28 @@ for(i in 1:length(list_process)){
     scale_y_continuous(limits = c(0,45),
                        sec.axis = sec_axis(~./4, name = "Rainfall (mm)")) +
     scale_colour_manual(name = "",
-                        values = c("Air temperature (2 m)" = "black", 
-                                   "Body temperature" = "goldenrod2",
-                                   "Rainfall" = "skyblue2"),
+                        values = c("Air temperature (2 m)" = "#000000", 
+                                   "Body temperature" = "#DAA520",
+                                   "Rainfall" = "#87CEEB"),
                         labels = c("Air Temperature", "Body Temperature", "Rain")) +
     annotate("text", x = as.POSIXct(date_max)-1e6, y = 45, # change if date changes
-             label = paste0("Median Daily Activity (%): ",
-                            round(median(per_active_day$per_active), digits = 1)), hjust = 0) +
+             label = paste0("Thermal Safety Margin: ",
+                            round(median(per_active_day$TSM), digits = 1)), hjust = 0) +
     theme_classic() + 
-    theme(legend.position.inside = c(0.2, 0.9), legend.position = "inside",
-          legend.direction = "horizontal", legend.title = element_blank(),
-          text = element_text(size = 12)) + theme(
+    theme(legend.position = "none", 
+          axis.title = element_blank()) + theme(
     panel.background = element_rect(fill = "transparent", colour = NA),
     plot.background  = element_rect(fill = "transparent", colour = NA),
     legend.background = element_rect(fill = "transparent", colour = NA),
-    legend.box.background = element_rect(fill = "transparent", colour = NA)
-  )
+    legend.box.background = element_rect(fill = "transparent", colour = NA))
   
   p2_list[[i]] <-
     ggplot() +
-    geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "skyblue2") +
+    geom_line(data = rain_lizard2, aes(y = rainfall, x = dates), colour = "#87CEEB") +
     labs(y = "Rainfall (mm)", x = "Date") +
-    theme_classic() + theme(
+    theme_classic() + theme(axis.title = element_blank(),
     panel.background = element_rect(fill = "transparent", colour = NA),
-    plot.background  = element_rect(fill = "transparent", colour = NA),
-    legend.background = element_rect(fill = "transparent", colour = NA),
-    legend.box.background = element_rect(fill = "transparent", colour = NA)
-  )
-    
-    
+    plot.background  = element_rect(fill = "transparent", colour = NA), legend.position = "none")
 }
 
 ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
@@ -378,6 +372,19 @@ plot_final <- extreme_map +
   inset_element(p2, left = 0.10,  right = 0.7, bottom = 0.40, top = 0.93)+
   plot_annotation(tag_levels = 'A') 
 plot_final
+
+## Save wrap_elements(
+ggsave(extreme_map, 
+       filename = "./outdir/extreme_heat_sleepy_lizard_microclimate.png", 
+       width = 10, height = 7, bg = "transparent")
+
+ggsave(p1_list[[1]], 
+       filename = "./outdir/extreme_heat_sleepy_lizard_microclimate_inset.png", 
+       width = 10, height = 7, bg = "transparent")
+
+ggsave(p1_list[[2]], 
+       filename = "./outdir/extreme_heat_sleepy_lizard_microclimate_inset2.png", 
+       width = 10, height = 7, bg = "transparent")
 
 ```
 
