@@ -342,7 +342,7 @@ for(i in 1:length(list_process)){
                             round(median(per_active_day$TSM), digits = 1)), hjust = 0) +
     theme_classic() + 
     theme(legend.position = "none", 
-          axis.title = element_blank()) + theme(
+          axis.title = element_blank()) + theme(axis.text = element_text(size = 24),
     panel.background = element_rect(fill = "transparent", colour = NA),
     plot.background  = element_rect(fill = "transparent", colour = NA),
     legend.background = element_rect(fill = "transparent", colour = NA),
@@ -354,29 +354,29 @@ for(i in 1:length(list_process)){
     labs(y = "Rainfall (mm)", x = "Date") +
     theme_classic() + theme(axis.title = element_blank(),
     panel.background = element_rect(fill = "transparent", colour = NA),
-    plot.background  = element_rect(fill = "transparent", colour = NA), legend.position = "none")
+    plot.background  = element_rect(fill = "transparent", colour = NA), legend.position = "none", axis.text = element_text(size = 24))
 }
 
-ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
+# ggarrange(p1_list[[1]], p1_list[[2]], common.legend = TRUE, legend = "bottom")
 
 
-#top <- plot_grid(extreme_map, g, ncol = 2, rel_widths = c(1,0.5))
-bottom <- ggarrange(p1_list[[1]], p1_list[[2]], ncol = 2, common.legend = TRUE, legend = "top")
-#plot_grid(top, bottom, nrow = 2, rel_heights = c(1.3,1))
-p1 <- p1_list[[1]] 
-p2 <- p1_list[[2]] + theme(legend.position = "none")
-plot_final <- extreme_map + 
-  annotate("segment", x = 115.5, xend = 114, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
-  annotate("segment", x = 124.5, xend = 130, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
-  inset_element(p1, left = -0.52,  right = 0.08, bottom = 0.52, top = 1.05)+
-  inset_element(p2, left = 0.10,  right = 0.7, bottom = 0.40, top = 0.93)+
-  plot_annotation(tag_levels = 'A') 
-plot_final
+# #top <- plot_grid(extreme_map, g, ncol = 2, rel_widths = c(1,0.5))
+# bottom <- ggarrange(p1_list[[1]], p1_list[[2]], ncol = 2, common.legend = TRUE, legend = "top")
+# #plot_grid(top, bottom, nrow = 2, rel_heights = c(1.3,1))
+# p1 <- p1_list[[1]] 
+# p2 <- p1_list[[2]] + theme(legend.position = "none")
+# plot_final <- extreme_map + 
+#   annotate("segment", x = 115.5, xend = 114, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
+#   annotate("segment", x = 124.5, xend = 130, y = -29.5, yend = -25, colour = "black", linewidth = 1.3, arrow = arrow(length = unit(0.4, "cm"), type   = "closed")) +
+#   inset_element(p1, left = -0.52,  right = 0.08, bottom = 0.52, top = 1.05)+
+#   inset_element(p2, left = 0.10,  right = 0.7, bottom = 0.40, top = 0.93)+
+#   plot_annotation(tag_levels = 'A') 
+# plot_final
 
-## Save wrap_elements(
-ggsave(extreme_map, 
-       filename = "./outdir/extreme_heat_sleepy_lizard_microclimate.png", 
-       width = 10, height = 7, bg = "transparent")
+# ## Save wrap_elements(
+# ggsave(extreme_map, 
+#        filename = "./outdir/extreme_heat_sleepy_lizard_microclimate.png", 
+#        width = 10, height = 7, bg = "transparent")
 
 ggsave(p1_list[[1]], 
        filename = "./outdir/extreme_heat_sleepy_lizard_microclimate_inset.png", 
