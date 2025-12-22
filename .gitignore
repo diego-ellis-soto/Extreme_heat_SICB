@@ -1,0 +1,11 @@
+.DS_Store
+.Rproj.user
+outdir/micro/micro_locs_10.RDS
+supp_files/figure-html/spatial_dat-1.png
+.Rhistory
+path
+outdir/global_climate/global_climate.nc
+.gitignore
+.gitignore
+outdir/global_climate/soilw.mon.ltm.v2.nc
+outdir/micro/micro_locs_2.RDS
