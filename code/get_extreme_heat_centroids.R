@@ -238,7 +238,7 @@ for(i in seq_len(nrow(valid_centroids_df))) {
   ylim <- c(bb$ymin - pad_y, bb$ymax + pad_y)
   
   ggplot() +
-    annotation_map_tile(type = "stamen_terrain", zoomin = 0) +   # terrain-like topography
+    # annotation_map_tile(type = "stamen_terrain", zoomin = 0) +   # terrain-like topography
     geom_sf(data = wa, fill = NA, color = "white", linewidth = 0.8) +
     geom_sf(data = pts_sf, alpha = 0.35, size = 2.0, color = "black") +
     geom_sf(data = cent_sf, size = 4.2, shape = 21, fill = "red", color = "white", stroke = 0.8) +
