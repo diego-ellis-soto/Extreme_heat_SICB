@@ -9,3 +9,6 @@ outdir/global_climate/global_climate.nc
 .gitignore
 outdir/global_climate/soilw.mon.ltm.v2.nc
 outdir/micro/micro_locs_2.RDS
+supp.qmd
+.gitignore
+worldclim/ 

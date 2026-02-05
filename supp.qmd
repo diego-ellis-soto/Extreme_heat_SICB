@@ -53,7 +53,7 @@ if(!requireNamespace("pacman", quietly = TRUE)) {
 # devtools::install_github("ilyamaclean/microclima")
 
 # Load required packages
-pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima, cowplot, ggpubr, patchwork, cowplot)
+pacman::p_load(terra, sf, rnaturalearth, mapview, raster, NicheMapR, lutz, tidyverse, magick, ggimage, grid, stars, microclima, cowplot, ggpubr, patchwork, cowplot, geodata)
 
 # Get climate data
 #get.global.climate(folder = "./outdir/global_climate")
@@ -389,6 +389,39 @@ ggsave(p1_list[[2]],
 ```
 
 
+# Comparing to Worldclime Bio 1
 
+```{r}
+#| label: compare_bio1
+#| echo: false
+#| message: false
+#| warning: false
+
+# Load WorldClim Bio1  (mean annual temperature) and Bio5 (Max Annual Temp - more realistic) data
+    bio <- worldclim_country(country = "AUS", var = "bio", res = 0.5, path = "./indir/worldclim/")
+    bio5 <- bio[[5]]  # Bio5 - Max Temperature of Warmest Month
+    bio1 <- bio[[1]]  # Bio1 - Mean Annual Temperature
+
+# Now, we need to extract Bio5 values for our points of interest in the sleepy lizard range
+
+  # make sure CRS's match between WC and points
+         coords <- data.frame(x = points$x, y = points$y)
+         coords <- sf::st_as_sf(coords, coords = c("x", "y"), crs = 4326)
+         coords <- sf::st_transform(coords, crs = terra::crs(bio5)) 
+  
+  # Extact values
+    bio5_values <- terra::extract(bio5, coords, xy = TRUE)
+    bio1_values <- terra::extract(bio1, coords, xy = TRUE)
+
+# Now calculate TSM for Bio5
+bio5_values <- bio5_values %>%
+  mutate(CT_max = 42) %>%
+  mutate(TSM_bio5 = CT_max - wc2.1_30s_bio_5)
+
+bio1_values <- bio1_values %>%
+  mutate(CT_max = 42) %>%
+  mutate(TSM_bio1 = CT_max - wc2.1_30s_bio_1)
+
+```
 
 
