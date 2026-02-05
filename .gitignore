@@ -12,3 +12,5 @@ outdir/micro/micro_locs_2.RDS
 supp.qmd
 .gitignore
 worldclim/ 
+indir/quail_ebird.csv
+

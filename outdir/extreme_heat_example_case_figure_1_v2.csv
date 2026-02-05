@@ -1,0 +1,5 @@
+"event_no","index_start","index_peak","index_end","duration","date_start","date_peak","date_end","intensity_mean","intensity_max","intensity_var","intensity_cumulative","intensity_mean_relThresh","intensity_max_relThresh","intensity_var_relThresh","intensity_cumulative_relThresh","intensity_mean_abs","intensity_max_abs","intensity_var_abs","intensity_cumulative_abs","rate_onset","rate_decline","pctile","indivID"
+8,10979,10987,11002,24,2021-06-21,2021-06-29,2021-07-14,8.4245,16.6481,3.4278,202.1886,3.3631,11.4829,3.3608,80.7149,31.0463,38.61,3.1401,745.11,1.3237,0.7143,"90","Washington"
+4,10979,10987,10992,14,2021-06-21,2021-06-29,2021-07-04,10.0079,16.6481,3.6262,140.1107,3.6875,10.3185,3.6091,51.625,31.6386,38.61,3.8516,442.94,1.3237,1.8772,"90","Washington"
+5,10998,10998,11002,5,2021-07-10,2021-07-10,2021-07-14,6.9609,7.2857,0.4069,34.8043,1.1521,1.5738,0.4349,5.7604,31.402,32.02,0.514,157.01,2.0684,0.3797,"90","Washington"
+2,10983,10987,10989,7,2021-06-25,2021-06-29,2021-07-01,12.8189,16.6481,3.0504,89.732,4.9536,8.8418,3.0952,34.6755,34.5557,38.61,3.2499,241.89,2.0654,3.3173,"90","Washington"

@@ -1,0 +1,252 @@
+---
+title: "Autocorrelation & Population Dynamics"
+output:
+  html_document: default
+  pdf_document: default
+date: "2026-01-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document contains the essential functions for replicating the Mathematica code used to generate autocorrelated time series, population dynamics, and extinction risk (based on code from https://doi.org/10.5281/zenodo.17728683).
+
+To generate autocorrelated time series with a given spectral exponent "gamma", length "Nobs", mean "mu", and variance "sigma", use spectral synthesis. To create a series with specific values (e.g., a defined normal distribution; actual meteorological data), first create a series with the desired length and autocorrelation level using synthesis, then apply those traits to the values using mimicry. Use a fourier transform to check the resulting spectral exponent.
+```{r synthesis}
+SpecSynFourier <- function(gamma, Nobs, mu = 0, sigma = 1, seed = 0) {
+  if (seed == 0) {set.seed(NULL)} else {set.seed(seed)}
+  phase <- runif(Nobs, min = 0, max = 2 * pi)
+  f <- seq(1 / Nobs, 1, length.out = Nobs)
+  magnitudes <- 1 / (f ^ (gamma / 2))
+  complex_vec <- magnitudes * exp(1i * phase)
+  complex_full <- c(0 + 0i, complex_vec[1:(Nobs - 1)])
+  time_series <- Re(fft(complex_full, inverse = TRUE))
+  standardized <- scale(time_series)
+  result <- as.numeric(standardized) * sigma + mu
+  return(result)}
+
+Mimic1 <- function(x, z) {
+  x_sorted <- sort(x)
+  z_order <- order(z)
+  y <- numeric(length(x))     
+  y[z_order] <- x_sorted
+  return(y)}
+
+estimate_spectral_exponent <- function(ts) {
+     N <- length(ts)
+     ts_detrended <- ts - mean(ts)
+     fft_vals <- fft(ts_detrended)
+     power <- Mod(fft_vals)^2 / N
+     freq <- (1:(N %/% 2)) / N
+     power <- power[2:(N %/% 2 + 1)]
+     log_freq <- log10(freq)
+     log_power <- log10(power)
+     fit <- lm(log_power ~ log_freq)
+     spectral_exponent <- -coef(fit)[2]
+     return(list(exponent = spectral_exponent, model = fit))}
+
+W <- rnorm (1000, mean = 25, sd = 2.75)
+X <- SpecSynFourier(gamma = 1, Nobs = 1000)
+Z <- Mimic1(W,X)
+result <- estimate_spectral_exponent(Z)
+spectralexponent <- estimate_spectral_exponent(Z)$exponent
+```
+
+Plot the generated time series and its power spectra (shown here for high autocorrelation, gamma = 1):
+```{r synthesis plots, echo=FALSE}
+plot(Z, type = "l", xlab = "Time", ylab = "Temperature")
+
+plot(log10((1:(length(Z) %/% 2)) / length(Z)), 
+     log10(Mod(fft(Z - mean(Z)))[2:(length(Z) %/% 2 + 1)]^2 / length(Z)), 
+     type = "l", col = "blue", 
+     main = "Log-Log Power Spectrum",
+     xlab = "log10(Frequency)", 
+     ylab = "log10(Power)")
+abline(result$model, col = "red", lty = 2)
+```
+
+Now that you have a time series, you can define a TPC and simulate the resulting population dynamics. Two example TPCs are hardcoded here; current code will use the same TPC plotted in Fig 4a (the other TPC instead uses 'gain1' and 'TPC_special'). You can substitute any TPC into the 'tpc' function; population growth rate TPCs including negative growth rates at stressfully hot and cold temperatures are ideal.
+```{r pop dynamics}
+# TPCs
+TI <- 29;
+beta <- 180;
+scaling_factor <- .755
+
+ma <- 0.000005;
+mb <- 0.4;
+mc <- 0.05;
+
+gain <- function(T) {exp(-((T - TI)^2) / beta)}
+loss <- function(T) {ma * exp(mb * T) + mc}
+tpc <- function(T) {(gain(T) - loss(T)) * scaling_factor}
+
+TI1 <- 35;
+beta1 <- 170;
+scaling_factor1 <- .4067
+gain1 <- function(T) {exp(-((T - TI1)^2) / beta1)}
+tpc_special <- function(T) {(gain1(T-2) - loss(T-2)) * scaling_factor1}
+
+#Simulation parameters
+alpha <- .001
+tmax <- 2000
+delta_t <- 1
+extinction_threshold <- (1 / alpha) * 1e-6
+
+#Generate temperature time series
+W <- rnorm (tmax, mean = 26, sd = 3)
+X <- SpecSynFourier(gamma = 1, Nobs = tmax)
+Z <- Mimic1(W,X)
+
+# Closed form solution of the r-alpha model
+nt <- function(t, ntlast, Z, tpc, alpha) {
+  r_val <- tpc(Z[t])
+  numerator <- r_val * exp(r_val * delta_t)
+  denominator <- (r_val / ntlast - alpha) + alpha * exp(r_val * delta_t)
+  result <- numerator / denominator
+  return(result)
+}
+
+# Initialize population series
+N <- length(Z)
+nt_series <- numeric(N)
+nt_series[1] <- 500
+
+# Run simulations
+for (t in 2:N) {
+  if (nt_series[t - 1] < extinction_threshold) {
+    nt_series[t] <- 0
+  } else {
+    nt_series[t] <- nt(t, nt_series[t - 1], Z, tpc, alpha)
+  }
+}
+```
+
+Plot the resulting population dynamics:
+```{r pop dynamic plots, echo=FALSE}
+layout(matrix(1:2, ncol = 1), heights = c(1, 1))
+par(mar = c(4, 4, 2, 1))
+plot(Z, type = "l", xlab = "Time Step", ylab = "Temperature")
+plot(nt_series, type = "l", xlab = "Time Step", ylab = "Population Size")
+```
+
+To assess how varying the level of temporal autocorrelation affects species with other TPCs, you'll need to import the climate and species-specific TPC data. I've included an example for the insect T. citricidus, using the TPC dataset from Deutsch et al. (2008) and pre-downloaded climate data from Visual Crossings (2024); these specific datasets can be downloaded from https://datadryad.org/dataset/doi:10.5061/dryad.w0vt4b91q, with further details in Robey & Vasseur (2026).
+
+However, any species and temperature time series can be subbed in here! To do so, you'll need to define and parameterize a TPC (that's 'GQtpc' in the current version) and import climate data into 'temp_data'; this is currently coded to handle data in the format of daily maximums and minimums. To vary the level of autocorrelation while preserving the structure of seasonal and diurnal temperature fluctuations, additional functions ('change_autocorr') have been introduced; for this to work properly without edits, imported data should include 2 datapoints per day, complete years, AND the same number of datapoints for each included year (for the VisualCrossings dataset, this means that Feb 29 of leap years is excluded from the analysis).
+```{r example species}
+# Import TPC data
+species <- "T.citricidus" # select species here. watch out for spelling!
+when <- "1994-01-01to2003-12-31"  # or "2014-01-01to2023-12-31"
+
+library(readxl)
+tpc_data <- read_excel("speciesparams.xlsx")
+species_row <- tpc_data[tpc_data[[1]] == species, ]
+species_data <- species_row[1, 2:ncol(species_row)]
+
+CTmax  <- species_data[1]
+Topt   <- species_data[2]
+sigmaP <- species_data[3]
+lat    <- as.character(species_data[4])
+long   <- as.character(species_data[5])
+
+GQtpc <- function(T, Topt, sigmaP, CTmax) {ifelse(T <= Topt,
+    exp(-((T - Topt) / (2 * sigmaP))^2),
+    1 - ((T - Topt) / (Topt - CTmax))^2)
+}
+
+# Import climate data
+csv_path <- paste0("VisualCrossingData/", species, "_", lat, ",", long, "_", when, ".csv")
+temp_data <- read.csv(csv_path, stringsAsFactors = FALSE)
+temps <- unlist(temp_data[ , c(2, 3)])
+paired_temps <- matrix(temps, ncol = 2, byrow = TRUE)
+mean_temps <- rowMeans(paired_temps)
+
+# Adjust time step size
+delta_t <- as.numeric(.5)
+
+# Define a function to seasonally detrend data
+change_autocorr <- function(X, gamma, samples_per_year, seed = 0) {
+  n <- length(X)
+  if (seed != 0) set.seed(seed)
+  
+  mean_X <- mean(X)
+  var_X <- var(X - mean_X)
+
+  mmeandevs <- sapply(1:samples_per_year, function(j) {
+    mean(X[seq(j, n, by = samples_per_year)])
+  })
+
+  Y <- sapply(1:n, function(i) {
+    X[i] - mmeandevs[(i - 1) %% samples_per_year + 1]
+  })
+
+  adjvar <- var(Y)
+
+  fft_data <- fft(Y, inverse = FALSE)
+  power_spectrum <- data.frame(
+    freq = (1:(n / 2 - 1)) / n,
+    power = Mod(fft_data[2:(n/2)])^2
+  )
+
+  log_fit <- lm(log(power) ~ log(freq), data = power_spectrum)
+
+  f <- seq(1/n, 1, by = 1/n)
+  phase <- runif(n, 0, 2 * pi)
+  mag <- 1 / (f^(gamma / 2))
+  complex_part <- mag * exp(1i * phase)
+
+  complex_full <- c(0 + 0i, 
+                    complex_part[1:(n / 2)], 
+                    rev(Conj(complex_part[2:(n / 2)])))
+
+  vec <- Re(fft(complex_full, inverse = TRUE)) / n
+  vec_std <- scale(vec)[, 1] * sqrt(adjvar)
+
+  Z <- sapply(1:n, function(i) {
+    vec_std[i] + mmeandevs[(i - 1) %% samples_per_year + 1]
+  })
+
+  return(list(
+    diagnostics = list(model = log_fit, var_original = var_X, var_deseasonalized = adjvar),
+    adjusted_series = Z
+  ))
+}
+
+# Permute the dataset
+X <- change_autocorr(mean_temps, gamma = .2, samples_per_year = 365, seed = 0)
+adjusted_means <- X$adjusted_series
+W <- unlist(temp_data[, c(2, 3)])
+Z_daily <- Mimic1(rowMeans(matrix(W, ncol = 2, byrow = TRUE)), adjusted_means)
+Z <- as.numeric(rep(Z_daily, each = 2))
+
+# and simulate the population dynamics
+nt <- function(t, ntlast, Z, Topt, sigmaP, CTmax, alpha) {
+  T <- Z[t]
+  r_val <- as.numeric(GQtpc(T, Topt, sigmaP, CTmax))
+  numerator <- r_val * exp(r_val * delta_t)
+  denominator <- (r_val / ntlast - alpha) + alpha * exp(r_val * delta_t)
+  return(numerator / denominator)
+}
+
+N <- length(Z)
+nt_series <- numeric(N)
+nt_series[1] <- 500
+extinction_threshold <- (1 / alpha) * 1e-6
+
+for (t in 2:N) {
+  if (nt_series[t - 1] < extinction_threshold) {
+    nt_series[t] <- 0
+  } else {
+    nt_series[t] <- nt(t, nt_series[t - 1], Z, Topt, sigmaP, CTmax, alpha)
+  }
+}
+```
+
+Plot the resulting simulation output:
+
+```{r example species plots, echo=FALSE}
+layout(matrix(1:2, ncol = 1), heights = c(1, 1))
+par(mar = c(4, 4, 2, 1))
+plot(Z, type = "l", xlab = "Time Step", ylab = "Temperature")
+plot(nt_series, type = "l", xlab = "Time Step", ylab = "Population Size")
+```
