@@ -14,7 +14,9 @@ library(lubridate)
 library(heatwaveR)
 library(ggplot2)
 library(tidyr)
-
+require(sf)
+library(grid)
+library(gtable)
 ##################################################################
 ## Parameters
 ##################################################################
@@ -298,6 +300,127 @@ geom_line(
     legend.position = "bottom"
   )
 
+
+##################################################################
+## (MAP) State outline + centroid point (auto-detect state)
+## - No USA map
+## - No hard-coded state name
+## - Centroid can be mean of multiple locations (if provided)
+##################################################################
+
+library(sf)
+library(rnaturalearth)
+library(dplyr)
+
+# ---------------------------------------------------------------
+# 1) Provide locations (one or many). If you only have one point,
+#    just keep one row.
+# ---------------------------------------------------------------
+locations_df <- data.frame(
+  lon = centroid_lon,
+  lat = centroid_lat
+)
+
+# If you *do* have multiple locations, use them instead, e.g.:
+# locations_df <- data.frame(lon = c(...), lat = c(...))
+
+# ---------------------------------------------------------------
+# 2) Compute centroid as MEAN of locations (flexible)
+# ---------------------------------------------------------------
+centroid_lon_mean <- mean(locations_df$lon, na.rm = TRUE)
+centroid_lat_mean <- mean(locations_df$lat, na.rm = TRUE)
+
+cent_sf <- st_as_sf(
+  data.frame(indivID = indivID, lon = centroid_lon_mean, lat = centroid_lat_mean),
+  coords = c("lon", "lat"),
+  crs = 4326
+)
+
+# Optional: also keep the original points if you want to show them
+pts_sf <- st_as_sf(locations_df, coords = c("lon", "lat"), crs = 4326)
+
+# ---------------------------------------------------------------
+# 3) Load US states and find which state contains the centroid
+# ---------------------------------------------------------------
+usa_states <- rnaturalearth::ne_states(
+  country = "United States of America",
+  returnclass = "sf"
+) %>%
+  st_transform(4326)
+
+# Find containing state (spatial join)
+state_hit <- st_join(cent_sf, usa_states, join = st_within, left = FALSE)
+
+if (nrow(state_hit) == 0) {
+  stop("Centroid point is not within any US state polygon (check lon/lat or CRS).")
+}
+
+# Extract that state's polygon
+state_name <- state_hit$name[1]
+state_poly <- usa_states %>% filter(name == state_name)
+
+# ---------------------------------------------------------------
+# 4) Plot state + centroid (and optionally all points)
+# ---------------------------------------------------------------
+bb <- st_bbox(state_poly)
+pad_x <- (bb$xmax - bb$xmin) * 0.05
+pad_y <- (bb$ymax - bb$ymin) * 0.05
+
+p_state_centroid <- ggplot() +
+  
+  # State polygon with black outline
+  geom_sf(
+    data = state_poly,
+    fill = "grey90",
+    color = "black",     # ← black outline
+    linewidth = 1.0      # ← thicker border for visibility
+  ) +
+  
+  # Optional: original locations
+  geom_sf(
+    data = pts_sf,
+    color = "grey30",
+    size = 2,
+    alpha = 0.7
+  ) +
+  
+  # BIG centroid point
+  geom_sf(
+    data = cent_sf,
+    shape = 21,
+    size = 14,            # ← much bigger centroid
+    fill = "red3",
+    color = "white",
+    stroke = 2         # thicker edge around centroid
+  ) +
+  
+  coord_sf(
+    xlim = c(bb$xmin - pad_x, bb$xmax + pad_x),
+    ylim = c(bb$ymin - pad_y, bb$ymax + pad_y),
+    expand = FALSE
+  ) +
+  labs(
+    title = paste0(state_name, " (state detected from centroid)"),
+    subtitle = paste0(
+      "Centroid (mean): ",
+      round(centroid_lat_mean, 3), ", ",
+      round(centroid_lon_mean, 3)
+    ),
+    x = NULL, y = NULL
+  ) +
+  theme_void(base_size = 16) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+ggsave(
+  filename = file.path(output_dir, paste0(indivID, "_state_centroid_", run_stamp, ".png")),
+  plot = p_state_centroid,
+  width = 6.5, height = 5.2, dpi = 300
+)
+
+
 ##################################################################
 ## Save plot + save posthoc object (no overwriting)
 ##################################################################
@@ -315,3 +438,53 @@ saveRDS(
 )
 
 print(p)
+# 
+# # print(p_state_centroid)
+# # 
+# # map_grob <- ggplotGrob(p_state_centroid)
+# 
+# p <- p +
+#   theme(
+#     plot.subtitle = element_text(margin = margin(r = 120))  # increase if needed
+#   )
+# 
+# # Convert plots to grobs
+# g_main <- ggplotGrob(p)
+# 
+# # Clean map (no margins) so it sits nicely as an inset
+# g_map <- ggplotGrob(
+#   p_state_centroid +
+#     theme_void() +
+#     theme(plot.margin = margin(0, 0, 0, 0))
+# )
+# 
+# # Find the "subtitle" row (falls back to "title" if no subtitle)
+# use_row <- if ("subtitle" %in% g_main$layout$name) "subtitle" else "title"
+# row_info <- g_main$layout[g_main$layout$name == use_row, ][1, ]
+# 
+# t <- row_info$t
+# b <- row_info$b
+# l <- row_info$l
+# r <- row_info$r
+# 
+# # Place the map in the top-right portion of that row
+# # (tweak 'w_cols' to make it wider/narrower)
+# w_cols <- 4
+# g_main <- gtable_add_grob(
+#   g_main,
+#   grobs = g_map,
+#   t = t, b = b,
+#   l = r - w_cols, r = r,
+#   z = Inf
+# )
+# 
+# # Draw (and save)
+# outfile <- file.path(output_dir, paste0(indivID, "_eventline_with_header_map_", run_stamp, ".png"))
+# png(outfile, width = 900, height = 1050, res = 150)
+# grid.newpage()
+# grid.draw(g_main)
+# dev.off()
+# 
+# # Optional: show in viewer
+# grid.newpage()
+# grid.draw(g_main)
