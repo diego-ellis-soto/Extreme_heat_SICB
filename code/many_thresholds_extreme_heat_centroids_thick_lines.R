@@ -199,41 +199,76 @@ col_thresh <- "#D55E00"   # Okabe–Ito vermillion (still reads as red)
 ##################################################################
 ## Plot (stacked panels)
 ##################################################################
+bottom_pctile <- max(pctiles)  # 95 in your case
+
 p <- ggplot() +
   
-  # Heatwave shading only during detected event durations
+  # Heatwave shading
   geom_ribbon(
     data = hw_shade_df,
     aes(x = t, ymin = ymin, ymax = ymax),
     fill = col_thresh, alpha = 0.35
   ) +
   
-  # Temperature line
+  # ----- Temperature line -----
+geom_line(
+  data = line_df %>% filter(series == "Temperature",
+                            pctile != bottom_pctile),
+  aes(x = t, y = value),
+  linewidth = 1.35,
+  color = col_temp
+) +
+  
   geom_line(
-    data = line_df %>% filter(series == "Temperature"),
-    aes(x = t, y = value),
-    linewidth = 1.35,
-    color = col_temp
+    data = line_df %>% filter(series == "Temperature",
+                              pctile == bottom_pctile),
+    aes(x = t, y = value, color = "Temperature"),
+    linewidth = 1.35
   ) +
   
-  # Climatology line
+  # ----- Climatology -----
+geom_line(
+  data = line_df %>% filter(series == "Climatology",
+                            pctile != bottom_pctile),
+  aes(x = t, y = value),
+  linewidth = 1.45,
+  color = col_clim
+) +
+  
   geom_line(
-    data = line_df %>% filter(series == "Climatology"),
-    aes(x = t, y = value),
-    linewidth = 1.45,
-    color = col_clim
+    data = line_df %>% filter(series == "Climatology",
+                              pctile == bottom_pctile),
+    aes(x = t, y = value, color = "Climatology"),
+    linewidth = 1.45
   ) +
   
-  # Threshold line
+  # ----- Threshold -----
+geom_line(
+  data = line_df %>% filter(series == "Threshold",
+                            pctile != bottom_pctile),
+  aes(x = t, y = value),
+  linewidth = 1.55,
+  color = col_thresh,
+  linetype = "dashed"
+) +
+  
   geom_line(
-    data = line_df %>% filter(series == "Threshold"),
-    aes(x = t, y = value),
+    data = line_df %>% filter(series == "Threshold",
+                              pctile == bottom_pctile),
+    aes(x = t, y = value, color = "Threshold"),
     linewidth = 1.55,
-    color = col_thresh,
     linetype = "dashed"
   ) +
   
   facet_wrap(~ pctile, ncol = 1) +
+  
+  scale_color_manual(
+    values = c(
+      Temperature = col_temp,
+      Climatology = col_clim,
+      Threshold   = col_thresh
+    )
+  ) +
   
   scale_x_date(
     limits = x_limits,
@@ -243,12 +278,11 @@ p <- ggplot() +
   ) +
   
   labs(
-    title = paste0(indivID, ": June–July ", compare_year,
-                   " (event-line style)"),
-    subtitle = paste0("Climatology: ", hist_start, "–", hist_end,
-                      " | Panels = percentile thresholds"),
+    title = paste0(indivID, ": June–July ", compare_year),
+    subtitle = paste0("Climatology: ", hist_start, "–", hist_end),
     x = NULL,
-    y = "Tmax (°C)"
+    y = "Tmax (°C)",
+    color = NULL
   ) +
   
   theme_minimal(base_size = 20) +
@@ -260,11 +294,10 @@ p <- ggplot() +
     axis.text = element_text(size = 14),
     panel.grid.minor = element_blank(),
     
-    # Completely remove legend
-    legend.position = "none"
+    # Legend appears naturally in bottom facet
+    legend.position = "bottom"
   )
 
-                                 
 ##################################################################
 ## Save plot + save posthoc object (no overwriting)
 ##################################################################
