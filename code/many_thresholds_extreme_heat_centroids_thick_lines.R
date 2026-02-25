@@ -282,24 +282,36 @@ geom_line(
   labs(
     title = paste0(indivID, ": June–July ", compare_year),
     subtitle = paste0("Climatology: ", hist_start, "–", hist_end),
-    x = NULL,
+    x = compare_year,   # e.g. "2021"
     y = "Tmax (°C)",
     color = NULL
-  ) +
+  )+
   
   theme_minimal(base_size = 20) +
   theme(
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      linewidth = 0.8
+    ),
     plot.title = element_text(face = "bold"),
     plot.subtitle = element_text(size = 16),
     strip.text = element_text(face = "bold", size = 15),
     axis.title.y = element_text(size = 18),
     axis.text = element_text(size = 14),
-    panel.grid.minor = element_blank(),
+    # panel.grid.minor = element_blank(),
+    panel.grid = element_blank(),
+    
     
     # Legend appears naturally in bottom facet
     legend.position = "bottom"
   )
 
+
+p = p +
+  coord_cartesian(
+    xlim = c(min(x_limits) + 5, max(x_limits) - 5)
+  )
 
 ##################################################################
 ## (MAP) State outline + centroid point (auto-detect state)
@@ -428,7 +440,7 @@ ggsave(
   filename = file.path(output_dir,
                        paste0(indivID, "_eventline_stacked_accessible_", run_stamp, ".png")),
   plot = p,
-  width = 10, height = 10, dpi = 300
+  width = 7, height = 10, dpi = 300
 )
 
 saveRDS(
